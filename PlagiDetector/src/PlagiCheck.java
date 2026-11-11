@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.Arrays;
 
-public class MainMerge {
+public class PlagiCheck {
 
     static void printTop(String algorithm, List<Result> results) {
 
