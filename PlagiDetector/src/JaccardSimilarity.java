@@ -68,6 +68,7 @@ public class JaccardSimilarity {
     }
 
     public double calculate(String text1, String text2) {
+
         return calculate(buildNGrams(text1), buildNGrams(text2));
     }
 

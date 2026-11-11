@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.Arrays;
 
 public class MainMerge {
 
@@ -40,7 +41,99 @@ public class MainMerge {
         }
     }
 
+    static final int MIN_PHRASE = 5;
+
+    static double strongScore(Result r) {
+        return Math.max(r.lcsPercent, r.jaccard);
+    }
+
+//    static String verdict(Result r) {
+////        double s = strongScore(r);
+////        if (s >= 70) return "HIGH";
+////        if (s >= 40) return "MEDIUM";
+////        return "LOW";
+//
+//    }
+
+    static String verdict(Result r) {
+        if (r.phraseLen >= 50 || r.jaccard >= 20) return "HIGH";
+        if (r.phraseLen >= 15 || r.jaccard >= 5)  return "MEDIUM";
+        return "LOW";
+    }
+
+    static String shortName(String path) {
+        return new File(path).getName();
+    }
+
+    static void printHeader(String targetPath, int targetWords,
+                            int compared, int skipped, double seconds) {
+        System.out.println("============================================");
+        System.out.println("Target   : " + shortName(targetPath) + " (" + targetWords + " words)");
+        System.out.println("Compared : " + compared + " files | Skipped: " + skipped);
+        System.out.printf("Time     : %.2f s%n", seconds);
+        System.out.println("============================================");
+    }
+
+    static void printSummaryTable(List<Result> results) {
+        results.sort(Comparator.comparingInt((Result r) -> r.phraseLen).reversed());
+
+
+        System.out.println();
+        System.out.println("===== Summary (sorted by longest copied phrase and jaccard score) =====");
+        System.out.printf("%-3s %-28s %8s %9s %8s  %s%n",
+                "#", "File", "LCS%", "Jaccard%", "Cosine%", "Verdict");
+
+        int limit = Math.min(3, results.size());
+        for (int k = 0; k < limit; k++) {
+            Result r = results.get(k);
+            System.out.printf("%-3d %-28s %8.2f %9.2f %8.2f  %s%n",
+                    k + 1, shortName(r.fileName),
+                    r.lcsPercent, r.jaccard, r.cosine, verdict(r));
+        }
+    }
+
+    static void printPhraseMatches(List<Result> results) {
+        List<Result> matched = new ArrayList<>();
+        for (Result r : results) {
+            if (r.phraseLen >= MIN_PHRASE) {
+                matched.add(r);
+            }
+        }
+
+        System.out.println();
+        System.out.println("===== Files sharing a phrase of " + MIN_PHRASE + "+ words ("
+                + matched.size() + " files) =====");
+
+        if (matched.isEmpty()) {
+            System.out.println("None found.");
+            return;
+        }
+
+        matched.sort(Comparator.comparingInt((Result r) -> r.phraseLen).reversed());
+
+        for (Result r : matched) {
+            System.out.println();
+            System.out.println(shortName(r.fileName));
+            System.out.printf("  Longest copied phrase (%d words): \"%s\"%n",
+                    r.phraseLen, shorten(r.phrase));
+        }
+    }
+
+    static String shorten(String phrase) {
+        String[] w = phrase.split(" ");
+        if (w.length <= 20) {
+            return phrase;
+        }
+        return String.join(" ", Arrays.copyOfRange(w, 0, 12))
+                + " ... "
+                + String.join(" ", Arrays.copyOfRange(w, w.length - 6, w.length));
+    }
+
+
+
     public static void main(String[] args) throws Exception {
+        long startTime = System.nanoTime();
+
         if (args.length < 2) {
             System.out.println("Enter <target> <file or folder>");
             return;
@@ -85,10 +178,10 @@ public class MainMerge {
             System.out.println("No .txt files found in folder");
             return;
         }
-        System.out.println("Target file is " + args[0]);
 
         String targetCanonical = targetFile.getCanonicalPath();
         List<Result> results = new ArrayList<>();
+        int skipped = 0;
 
         int i = 0;
         while (i < textFiles.size()) {
@@ -109,10 +202,13 @@ public class MainMerge {
                 double jaccardPercent = jaccard.calculatePercent(targetGrams, jaccard.buildNGrams(textB));
                 double cosinePercent = cosine.calculatePercent(targetFreq, cosine.buildFrequencyMap(textB));
 
+                List<String> phrase = LCS.longestCommonPhrase(tokensOfTarget, tokensOfComparedFile);
+
                 results.add(new Result(textFiles.get(i).getPath(), common.size(),
-                        lcsPercent, jaccardPercent, cosinePercent));
+                        lcsPercent, jaccardPercent, cosinePercent, phrase));
 
             } catch (Exception e) {
+                skipped++;
                 System.out.println("Skipped (cannot read): " + textFiles.get(i).getPath());
             }
 
@@ -124,8 +220,10 @@ public class MainMerge {
             return;
         }
 
-        printTop("LCS", results);
-        printTop("JACCARD", results);
-        printTop("COSINE", results);
+        double seconds = (System.nanoTime() - startTime) / 1_000_000_000.0;
+
+        printHeader(filePath, tokensOfTarget.size(), results.size(), skipped, seconds);
+        printSummaryTable(results);
+        printPhraseMatches(results);
     }
 }
