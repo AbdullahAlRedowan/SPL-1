@@ -1,0 +1,12 @@
+javac -d out src/*.java 
+
+
+
+
+
+java -cp out \src\PlagiCheck .\test2.txt C:\Users\Hp\OneDrive\Documents\GitHub\SPL-1\DatasetForPDemo\
+
+
+
+
+java -cp out PlagiCheck .\test3FullMatch.txt C:\Users\Hp\OneDrive\Documents\GitHub\SPL-1\DatasetForPDemo\
